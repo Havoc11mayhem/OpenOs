@@ -1,2 +1,2 @@
 # OpenOs
-simple Linux distro meant to be very customizable
+simple operating system meant to be very customizable
