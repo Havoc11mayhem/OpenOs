@@ -1,24 +1,90 @@
-bits 16                 ; Tell NASM to generate 16-bit code
-org 0x7c00              ; Tell NASM the code will be loaded at address 0x7c00 by the BIOS
+[org 0x7c00]                        
+KERNEL_LOCATION equ 0x1000
+                                    
 
-boot:
-    mov si, hello       ; Point the SI register to the "hello" message
-    mov ah, 0x0e        ; 0x0e means 'Write Character in TTY mode' for INT 0x10
+mov [BOOT_DISK], dl                 
 
-.loop:
-    lodsb               ; Load byte at address DS:SI into AL and increment SI
-    or al, al           ; Check if AL is zero (end of string)
-    jz halt             ; If AL is zero, jump to the 'halt' label
-    int 0x10            ; Call the BIOS video services interrupt
-    jmp .loop           ; Jump back to the start of the loop
+                                    
+xor ax, ax                          
+mov es, ax
+mov ds, ax
+mov bp, 0x8000
+mov sp, bp
 
-halt:
-    cli                 ; Clear interrupts flag
-    hlt                 ; Halt the CPU execution (infinite loop)
+mov bx, KERNEL_LOCATION
+mov dh, 2
 
-hello:
-    db "Hello user, OpenOS is starting...", 0 ; The string to print, terminated by a null byte (0)
+mov ah, 0x02
+mov al, dh 
+mov ch, 0x00
+mov dh, 0x00
+mov cl, 0x02
+mov dl, [BOOT_DISK]
+int 0x13                ; no error management, do your homework!
 
-; Fill the rest of the 512 bytes with zeros and add the boot signature
-times 510 - ($-$$) db 0
-dw 0xaa55               ; The boot sector magic number (0x55AA in memory due to little-endian)
+                                    
+mov ah, 0x0
+mov al, 0x3
+int 0x10                ; text mode
+
+
+CODE_SEG equ GDT_code - GDT_start
+DATA_SEG equ GDT_data - GDT_start
+
+cli
+lgdt [GDT_descriptor]
+mov eax, cr0
+or eax, 1
+mov cr0, eax
+jmp CODE_SEG:start_protected_mode
+
+jmp $
+                                    
+BOOT_DISK: db 0
+
+GDT_start:
+    GDT_null:
+        dd 0x0
+        dd 0x0
+
+    GDT_code:
+        dw 0xffff
+        dw 0x0
+        db 0x0
+        db 0b10011010
+        db 0b11001111
+        db 0x0
+
+    GDT_data:
+        dw 0xffff
+        dw 0x0
+        db 0x0
+        db 0b10010010
+        db 0b11001111
+        db 0x0
+
+GDT_end:
+
+GDT_descriptor:
+    dw GDT_end - GDT_start - 1
+    dd GDT_start
+
+
+[bits 32]
+start_protected_mode:
+    mov ax, DATA_SEG
+	mov ds, ax
+	mov ss, ax
+	mov es, ax
+	mov fs, ax
+	mov gs, ax
+	
+	mov ebp, 0x90000		; 32 bit stack base pointer
+	mov esp, ebp
+
+    jmp KERNEL_LOCATION
+
+                                     
+ 
+times 510-($-$$) db 0              
+dw 0xaa55

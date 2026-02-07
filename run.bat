@@ -1,0 +1,1 @@
+qemu-system-x86_64 -drive file=c:/openos/boot.bin,format=raw
